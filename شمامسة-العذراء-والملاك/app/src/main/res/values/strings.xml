@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">شمامسة الإخلاص</string>
+    <string name="church_header_title">شمامسة العذراء والملاك ميخائيل - الاخلاص</string>
+    <string name="church_sub_title">كنيسة السيدة العذراء ورئيس الملائكة ميخائيل - الأخلاص</string>
+    <string name="sign_in_with_google">تسجيل الدخول بحساب Google</string>
+    <string name="welcome_message">أهلاً بك في منظومة خدمة شمامسة الكنيسة</string>
+    <string name="sign_out">تسجيل الخروج</string>
+    <string name="tab_deacons">الشمامسة</string>
+    <string name="tab_classes">الفصول</string>
+    <string name="tab_uncles">خدام الفصول (أنكل)</string>
+    <string name="tab_dashboard">لوحة التحكم</string>
+    <string name="add_deacon">إضافة شماس جديد</string>
+    <string name="add_class">إضافة فصل جديد</string>
+    <string name="add_uncle">إضافة أنكل جديد</string>
+    <string name="search_placeholder">بحث بالاسم، الرتبة، أو الهاتف...</string>
+    <string name="whatsapp_chat">واتساب</string>
+    <string name="direct_call">اتصال</string>
+    <string name="all_classes">كل الفصول</string>
+    <string name="rank_epsaltos">إبصالتس (مرتل)</string>
+    <string name="rank_agnostos">أغنسطس (قارئ)</string>
+    <string name="rank_epidiacon">إيبودياكون (مساعد شماس)</string>
+    <string name="rank_deacon">دياكون (شماس كامل)</string>
+    <string name="rank_preparatory">تمهيدي / مستمع</string>
+    <string name="role_super_admin">الآدمن الأكبر</string>
+    <string name="role_uncle">أنكل / خادم فصل</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+    <string name="delete">حذف</string>
+    <string name="edit">تعديل</string>
+</resources>

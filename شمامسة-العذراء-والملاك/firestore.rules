@@ -1,0 +1,171 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        ('email' in request.auth.token && request.auth.token.email == 'karasreda146@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp && val <= request.time;
+    }
+
+    // --- Entity Validators ---
+    function isValidAdmin(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.email is string && data.email.size() <= 120 &&
+             data.role == 'super_admin' &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt));
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 80 &&
+             (data.role == 'super_admin' || data.role == 'uncle') &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('assignedClassIds' in data) || (data.assignedClassIds is list && data.assignedClassIds.size() <= 50)) &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    function isValidClass(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+             data.stage is string && data.stage.size() >= 2 && data.stage.size() <= 60 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 300)) &&
+             (!('assignedUncleIds' in data) || (data.assignedUncleIds is list && data.assignedUncleIds.size() <= 50)) &&
+             (!('assignedUncleNames' in data) || (data.assignedUncleNames is list && data.assignedUncleNames.size() <= 50)) &&
+             (!('studentCount' in data) || data.studentCount is int) &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    function isValidDeacon(data) {
+      return data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+             data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 30 &&
+             data.rank is string && data.rank.size() >= 2 && data.rank.size() <= 50 &&
+             data.classId is string && data.classId.size() <= 128 &&
+             (!('parentPhone' in data) || (data.parentPhone is string && data.parentPhone.size() <= 30)) &&
+             (!('className' in data) || (data.className is string && data.className.size() <= 100)) &&
+             (!('grade' in data) || (data.grade is string && data.grade.size() <= 60)) &&
+             (!('birthDate' in data) || (data.birthDate is string && data.birthDate.size() <= 40)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('addedByUid' in data) || (data.addedByUid is string && data.addedByUid.size() <= 128)) &&
+             (!('assignedUncleIds' in data) || (data.assignedUncleIds is list && data.assignedUncleIds.size() <= 50)) &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    // --- Collection Rules ---
+
+    // Admins collection
+    match /admins/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSuperAdmin();
+      allow create: if isSuperAdmin() &&
+                       incoming().userId == userId &&
+                       isValidAdmin(incoming());
+      allow update: if isSuperAdmin() &&
+                       incoming().userId == existing().userId &&
+                       isValidAdmin(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['email', 'role', 'updatedAt']);
+      allow delete: if isSuperAdmin() && userId != request.auth.uid; // Prevent deleting self
+    }
+
+    // User profiles (Super Admin & Uncles)
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        // Super Admin creating an Uncle or Admin account
+        (isSuperAdmin() && isValidUserProfile(incoming())) ||
+        // User initial sign-in profile creation
+        (request.auth.uid == userId && incoming().userId == userId &&
+         (incoming().role == 'uncle' || (incoming().role == 'super_admin' && isSuperAdmin())) &&
+         isValidUserProfile(incoming()))
+      ) && incoming().keys().hasAll(['userId', 'email', 'displayName', 'role']);
+
+      allow update: if isSignedIn() && (
+        // Super Admin can update any profile including roles and class assignments
+        isSuperAdmin() ||
+        // Regular user can update their own name/phone, but cannot elevate role or change assigned classes
+        (request.auth.uid == userId &&
+         incoming().userId == existing().userId &&
+         incoming().role == existing().role &&
+         (!('assignedClassIds' in existing()) || incoming().assignedClassIds == existing().assignedClassIds) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'updatedAt']))
+      ) && isValidUserProfile(incoming());
+
+      allow delete: if isSuperAdmin() && userId != request.auth.uid;
+    }
+
+    // Classes / Groups
+    match /classes/{classId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isSuperAdmin() &&
+                       isValidClass(incoming()) &&
+                       incoming().keys().hasAll(['name', 'stage']);
+
+      allow update: if isSuperAdmin() &&
+                       isValidClass(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'stage', 'description', 'assignedUncleIds', 'assignedUncleNames', 'studentCount', 'updatedAt']);
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // Deacons
+    match /deacons/{deaconId} {
+      // Any signed in Uncle or Admin can view or list deacons
+      allow get, list: if isSignedIn() && (
+        isSuperAdmin() ||
+        resource.data.addedByUid == request.auth.uid ||
+        request.auth.uid in resource.data.assignedUncleIds ||
+        // Or if uncle has class in assignedClassIds
+        resource.data.classId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedClassIds
+      );
+
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        // Uncle must be assigned to the class they are adding a deacon to
+        incoming().classId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedClassIds
+      ) && isValidDeacon(incoming()) &&
+           incoming().keys().hasAll(['fullName', 'phone', 'rank', 'classId']);
+
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        existing().classId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedClassIds
+      ) && isValidDeacon(incoming()) &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'parentPhone', 'rank', 'classId', 'className', 'grade', 'birthDate', 'address', 'notes', 'assignedUncleIds', 'updatedAt']);
+
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
