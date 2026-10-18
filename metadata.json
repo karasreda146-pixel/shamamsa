@@ -1,0 +1,6 @@
+{
+  "name": "شمامسة العذراء والملاك",
+  "description": "تطبيق إدارة شمامسة كنيسة العذراء والملاك ميخائيل - الإخلاص، إدارة الفصول، والاتصال المباشر والواتساب وتوزيع المهام",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
